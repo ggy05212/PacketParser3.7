@@ -2,7 +2,7 @@
 #include <QDateTime>
 #include <QStringList>
 #include <QDebug>
-
+#include <QtGlobal>
 PacketParser::PacketParser(QObject *parent) : QObject(parent) {
     // 初始化Winsock
     WSADATA wsaData;
@@ -179,6 +179,8 @@ void PacketParser::parseAllPackets() {
                     tcp_header *tcp = (tcp_header *)transportStart;
                     info.protocol = "TCP";
 
+
+
                     //判断是否为SSH协议（默认端口22）
                     u_short srcPort = ntohs(tcp->src_port);
                     u_short dstPort = ntohs(tcp->dest_port);
@@ -186,15 +188,38 @@ void PacketParser::parseAllPackets() {
                         info.protocol = "SSHv2";
                         info.protocolChain += " → SSH";  // 添加ssh协议
                     }
+                    // 提取TCP字段（新增）
+                    info.hasTcpInfo = true;
+                    info.tcpSrcPort = ntohs(tcp->src_port);
+                    info.tcpDstPort = ntohs(tcp->dest_port);
+                    info.tcpSeq = ntohl(tcp->seq);       // 序列号（网络字节序转主机）
+                    info.tcpAck = ntohl(tcp->ack);       // 确认号
+                    info.tcpWindow = ntohs(tcp->window); // 窗口大小
+                    info.tcpChecksum = ntohs(tcp->check); // 校验和
 
+                    // 解析TCP标志位（SYN、ACK等）
                     QString flags;
                     if (tcp->flags & TH_SYN) flags += "SYN ";
                     if (tcp->flags & TH_ACK) flags += "ACK ";
+                    if (tcp->flags & 0x01) flags += "FIN ";   // FIN标志
+                    if (tcp->flags & 0x04) flags += "RST ";   // RST标志
+                    if (tcp->flags & 0x08) flags += "PSH ";   // PSH标志
+                    if (tcp->flags & 0x20) flags += "URG ";   // URG标志
 
                     info.info = QString("源端口: %1, 目的端口: %2, 标志: %3")
                             .arg(ntohs(tcp->src_port))
                             .arg(ntohs(tcp->dest_port))
                             .arg(flags.trimmed());
+
+                    // 计算TCP头部长度（数据偏移字段 * 4）
+                       int tcpHeaderLen = (tcp->data_off >> 4) * 4;
+                       // 载荷起始位置 = 以太网头部 + IP头部 + TCP头部
+                       const u_char* payloadStart = transportStart + tcpHeaderLen;
+                       // 载荷长度 = 数据包总长度 - 已解析的头部长度
+                       int payloadLen = header->caplen - (payloadStart - packet);
+
+                       // 提取载荷数据
+                       info.payloadData = QByteArray((const char*)payloadStart, payloadLen);
 
 
                 } else if (ip->protocol == IPPROTO_UDP) {  // UDP协议
@@ -211,11 +236,54 @@ void PacketParser::parseAllPackets() {
                         info.protocolChain += " → SNMP";  // 添加SNMP协议
                     }
 
+                    // 提取UDP字段（新增）
+                     info.hasUdpInfo = true;
+                     info.udpSrcPort = ntohs(udp->src_port);
+                     info.udpDstPort = ntohs(udp->dest_port);
+                     info.udpLength = ntohs(udp->len);     // 总长度（头部+数据）
+                     info.udpChecksum = ntohs(udp->check); // 校验和
+
 
                     info.info = QString("源端口: %1, 目的端口: %2, 长度: %3")
                             .arg(ntohs(udp->src_port))
                             .arg(ntohs(udp->dest_port))
                             .arg(ntohs(udp->len));
+
+
+                    // UDP头部固定8字节，载荷起始位置 = UDP头部结束处
+                       const u_char* payloadStart = transportStart + sizeof(udp_header);
+                       // 载荷长度 = UDP总长度 - UDP头部长度（8字节）
+                       int udpTotalLen = ntohs(udp->len);
+
+                       qint64 val1 = qint64(udpTotalLen) - sizeof(udp_header);
+                       qint64 val2 = qint64(header->caplen) - (payloadStart - packet);
+
+                       // 确保长度非负（避免计算错误导致的负数），再取最小值
+                       int payloadLen = qMin(
+                           static_cast<int>(qMax(val1, 0LL)),  // 0LL确保是long long类型，与qint64匹配
+                           static_cast<int>(qMax(val2, 0LL))
+                       );
+                       // 提取载荷数据
+                       info.payloadData = QByteArray((const char*)payloadStart, payloadLen);
+
+                       // 转换载荷为十六进制和ASCII格式
+                       // 十六进制：每字节用2位十六进制表示，空格分隔
+                       QString hexStr;
+                       // ASCII：可打印字符直接显示，不可打印字符用.代替
+                       QString asciiStr;
+                       for (int i = 0; i < info.payloadData.size(); ++i) {
+                           u_char c = (u_char)info.payloadData[i];
+                           hexStr += QString("%1 ").arg(c, 2, 16, QChar('0')).toUpper();
+                           asciiStr += (c >= 32 && c <= 126) ? QChar(c) : '.';
+
+                           // 每16字节换行，方便阅读
+                           if ((i + 1) % 16 == 0) {
+                               hexStr += "\n";
+                               asciiStr += "\n";
+                           }
+                       }
+                       info.payloadHex = hexStr.trimmed();
+                       info.payloadAscii = asciiStr.trimmed();
 
                 } else {
                     info.protocol = QString("IP（协议号：%1）").arg((int)ip->protocol);

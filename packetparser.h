@@ -84,9 +84,29 @@ struct PacketInfo {
     QString ethdetail;       // 以太网层详细信息（协议类型）
     QString protocolChain;   // 帧中包含的所有协议链
     QString ipVersion;       // IP版本
-    int ttl;
+    int ttl;                 //生存时间
     QByteArray rawData;          // 存储原始数据包拷贝
     struct pcap_pkthdr packetHeader; // 存储头部拷贝（不再是指针）
+    QByteArray payloadData;  // 载荷原始数据
+    QString payloadHex;      // 载荷的十六进制表示
+    QString payloadAscii;    // 载荷的ASCII表示（可打印字符）
+
+    // TCP相关字段（新增）
+    int tcpSrcPort;       // TCP源端口
+    int tcpDstPort;       // TCP目的端口
+    quint32 tcpSeq;       // TCP序列号
+    quint32 tcpAck;       // TCP确认号
+    QString tcpFlags;     // TCP标志位（如SYN、ACK）
+    int tcpWindow;        // TCP窗口大小
+    int tcpChecksum;      // TCP校验和
+    bool hasTcpInfo=false;      // 是否包含TCP信息
+
+    // UDP相关字段（新增）
+    int udpSrcPort;       // UDP源端口
+    int udpDstPort;       // UDP目的端口
+    int udpLength;        // UDP总长度
+    int udpChecksum;      // UDP校验和
+    bool hasUdpInfo=false;      // 是否包含UDP信息
 
 };
 

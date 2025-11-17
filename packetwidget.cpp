@@ -121,6 +121,51 @@ void PacketWidget::buildDetailTree(const PacketInfo &info) {
         ui->detailTree->addTopLevelItem(ipItem);
     }
 
+    if (info.hasTcpInfo) {
+           QTreeWidgetItem *tcpItem = new QTreeWidgetItem({"TCP层"});
+           tcpItem->addChild(new QTreeWidgetItem({"源端口", QString::number(info.tcpSrcPort)}));
+           tcpItem->addChild(new QTreeWidgetItem({"目的端口", QString::number(info.tcpDstPort)}));
+           tcpItem->addChild(new QTreeWidgetItem({"序列号", QString::number(info.tcpSeq)}));
+           tcpItem->addChild(new QTreeWidgetItem({"确认号", QString::number(info.tcpAck)}));
+           tcpItem->addChild(new QTreeWidgetItem({"标志位", info.tcpFlags}));
+           tcpItem->addChild(new QTreeWidgetItem({"窗口大小", QString::number(info.tcpWindow)}));
+           tcpItem->addChild(new QTreeWidgetItem({"校验和", QString("0x%1").arg(info.tcpChecksum, 4, 16, QChar('0')).toUpper()}));
+           ui->detailTree->addTopLevelItem(tcpItem);
+       }
+
+       // 新增：UDP层节点（如果有UDP信息）
+       if (info.hasUdpInfo) {
+           QTreeWidgetItem *udpItem = new QTreeWidgetItem({"UDP层"});
+           udpItem->addChild(new QTreeWidgetItem({"源端口", QString::number(info.udpSrcPort)}));
+           udpItem->addChild(new QTreeWidgetItem({"目的端口", QString::number(info.udpDstPort)}));
+           udpItem->addChild(new QTreeWidgetItem({"总长度", QString::number(info.udpLength) + " 字节（含头部8字节）"}));
+           udpItem->addChild(new QTreeWidgetItem({"校验和", QString("0x%1").arg(info.udpChecksum, 4, 16, QChar('0')).toUpper()}));
+           ui->detailTree->addTopLevelItem(udpItem);
+       }
+
+
+
+    if (!info.payloadData.isEmpty()) {
+          QTreeWidgetItem *payloadItem = new QTreeWidgetItem({"数据载荷"});
+          payloadItem->addChild(new QTreeWidgetItem({"载荷长度", QString("%1 字节").arg(info.payloadData.size())}));
+
+          // 十六进制视图
+          QTreeWidgetItem *hexItem = new QTreeWidgetItem({"十六进制"});
+          hexItem->addChild(new QTreeWidgetItem({info.payloadHex}));  // 子节点显示十六进制内容
+          payloadItem->addChild(hexItem);
+
+          // ASCII视图
+          QTreeWidgetItem *asciiItem = new QTreeWidgetItem({"ASCII"});
+          asciiItem->addChild(new QTreeWidgetItem({info.payloadAscii}));  // 子节点显示ASCII内容
+          payloadItem->addChild(asciiItem);
+
+          ui->detailTree->addTopLevelItem(payloadItem);
+      } else {
+          // 无载荷数据时添加提示
+          QTreeWidgetItem *payloadItem = new QTreeWidgetItem({"数据载荷", "无载荷数据"});
+          ui->detailTree->addTopLevelItem(payloadItem);
+      }
+
     // 展开所有节点
     ui->detailTree->expandAll();
 
