@@ -155,9 +155,9 @@ void PacketWidget::buildDetailTree(const PacketInfo &info) {
           payloadItem->addChild(hexItem);
 
           // ASCII视图
-          QTreeWidgetItem *asciiItem = new QTreeWidgetItem({"ASCII"});
-          asciiItem->addChild(new QTreeWidgetItem({info.payloadAscii}));  // 子节点显示ASCII内容
-          payloadItem->addChild(asciiItem);
+//          QTreeWidgetItem *asciiItem = new QTreeWidgetItem({"ASCII"});
+//          asciiItem->addChild(new QTreeWidgetItem({info.payloadAscii}));  // 子节点显示ASCII内容
+//          payloadItem->addChild(asciiItem);
 
           ui->detailTree->addTopLevelItem(payloadItem);
       } else {
@@ -170,6 +170,9 @@ void PacketWidget::buildDetailTree(const PacketInfo &info) {
     ui->detailTree->expandAll();
 
     ui->hexDisplay->setText(formatHexData(info.rawData));
+
+
+
 
 }
 
@@ -187,21 +190,29 @@ QString PacketWidget::formatHexData(const QByteArray &data)
 
           // 16进制数据部分
           int lineEnd = qMin(i + bytesPerLine, data.size());
+            int bytesInLine = lineEnd - i;
           for (int j = i; j < lineEnd; ++j) {
               hexStr += QString("%1 ").arg((uchar)data[j], 2, 16, QChar('0')).toUpper();
           }
 
-          // 补充空格使ASCII部分对齐
-          int spaceCount = (bytesPerLine - (lineEnd - i)) * 3;
-          hexStr += QString(spaceCount, ' ');
+          // 计算需要补充的空格，使ASCII部分对齐
+          // 每个字节对应3个字符(2个十六进制字符+1个空格)
+          int spacesToAdd = (bytesPerLine - bytesInLine) * 3;
+          hexStr += QString(" ").repeated(spacesToAdd);
 
           // ASCII字符部分（可打印字符显示，其他显示'.'）
-          for (int j = i; j < lineEnd; ++j) {
-              uchar c = (uchar)data[j];
-              hexStr += (c >= 32 && c <= 126) ? QChar(c) : '.';
-          }
+//          for (int j = i; j < lineEnd; ++j) {
+//              uchar c = (uchar)data[j];
+//              if (c >= 32 && c <= 126) {
+//                  hexStr += QChar(c);
+//              } else {
+//                  // 使用HTML格式设置灰色点
+//                  hexStr += QString("<span style='color: #888888;'>.</span>");
+//              }
 
-          hexStr += "\n";  // 换行
+//          }
+          // 每行结束后添加换行（使用HTML的换行标签）
+          hexStr += "<br>";
       }
 
       return hexStr;
